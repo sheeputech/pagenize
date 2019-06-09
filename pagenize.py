@@ -21,9 +21,8 @@ def init(ctx):
 
 @pagenize.command(help='Collect your .html and .md files into docs/ with index pages.')
 @click.option('-y', '--no-ask', 'yes', is_flag=True, help='Answer "yes" automatically.')
-@click.option('-R', '--render-rmarkdown', 'render_rmd', is_flag=True, help='Render RMarkdown files to HTML and include them into docs/.')
 @click.pass_context
-def create_docs(ctx, yes, render_rmd):
+def create_docs(ctx, yes):
     # Confirmation
     curdir = os.getcwd()
     if not yes:
@@ -34,7 +33,7 @@ def create_docs(ctx, yes, render_rmd):
     else:
         print(f'The following directory will be pagenized: {curdir}')
 
-    # Read config file
+    # TODO Read config file
 
     # Remove docs/
     if os.path.isdir('docs'):
@@ -56,21 +55,18 @@ def create_docs(ctx, yes, render_rmd):
             os.makedirs(dirname)
 
     # Copy .md files into docs
-    print("--------------- The following Markdown files will be copied into docs. ---------------")
+    print("----- Files will be copied into docs -------------------------------------------------")
     for i, path in enumerate(origin_paths):
         print('{}. {}'.format(i, path))
         shutil.copy2(path, docs_paths[i])
     print("--------------------------------------------------------------------------------------")
 
-    # Collect and render from RMarkdown to html into docs
-    if render_rmd:
-        subprocess.call('Rscript pagenize/render.R')
-
-    # Remove other than .html and .md
+    # Remove files other than .html and .md in docs/
     for f in [p for p in glob.glob('./docs/**', recursive=True) if
               re.search(r'^.*^(?!.*\.html|.*\.md)', p) and os.path.isfile(p)]:
         os.remove(f)
 
+    # Remove empty dirs in docs/
     ctn = True
     while ctn:
         empty_dirs = [p for p in glob.glob('./docs/**', recursive=True)
@@ -82,7 +78,11 @@ def create_docs(ctx, yes, render_rmd):
                 os.rmdir(d)
 
     # Make index.md in each dir
+    print("Making index pages...")
     make_index_pages('.\\docs')
+
+    # complete
+    print("Successfully completed pagenize.")
 
 
 def make_index_pages(path):
