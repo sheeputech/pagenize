@@ -23,6 +23,11 @@ def init(ctx):
 @click.option('-y', '--no-ask', 'yes', is_flag=True, help='Answer "yes" automatically.')
 @click.pass_context
 def create_docs(ctx, yes):
+    # Check if there is ".git" directory in current directory
+    if os.listdir(path='.').count('.git') == 0:
+        print('There is no ".git" directory in this directory.')
+        return
+
     # Confirmation
     curdir = os.getcwd()
     if not yes:
@@ -86,9 +91,20 @@ def create_docs(ctx, yes):
 
 
 def make_index_pages(path):
-    # TODO detect repository name automatically and set base_url
-    github_user = 'sheeputech'
-    github_repo = 'class'
+    username = subprocess.check_output('git config --get user.name')
+    remote = subprocess.check_output('git config --get remote.origin.url')
+
+    github_user = ''
+    github_repo = ''
+    if str(remote).startswith('https://github.com'):
+        repo = str(remote).rsplit('/')[-2:]
+        github_user = repo[0]
+        github_repo = repo[1]
+    elif str(remote).startswith('git@github.com'):
+        repo = str(remote).rsplit(':', 1)[1].split('/')
+        github_user = repo[0]
+        github_repo = repo[1]
+
     base_url = f'https://{github_user}.github.io/{github_repo}'
 
     curdir = os.getcwd()
@@ -114,8 +130,10 @@ def make_index_pages(path):
         info = textwrap.dedent(f"""
             # Info
 
+            Author: {username}
+
             - This index page is automatically generated with my Python script named [pagenize](https://github.com/sheeputech/pagenize)
-            - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
+            - Repository of this page: [GitHub %7C {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
         """)
 
         # breadcrumb
