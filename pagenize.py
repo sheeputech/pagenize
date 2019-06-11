@@ -94,14 +94,17 @@ def make_index_pages(path):
     username = subprocess.check_output('git config --get user.name')
     remote = subprocess.check_output('git config --get remote.origin.url')
 
+    username_str = str(username).split("'")[1].split('\\n')[0]
+    remote_str = str(remote).split("'")[1].split('\\n')[0]
+
     github_user = ''
     github_repo = ''
-    if str(remote).startswith('https://github.com'):
-        repo = str(remote).rsplit('/')[-2:]
+    if remote_str.startswith('https://github.com'):
+        repo = remote_str.rsplit('/')[-2:]
         github_user = repo[0]
         github_repo = repo[1]
-    elif str(remote).startswith('git@github.com'):
-        repo = str(remote).rsplit(':', 1)[1].split('/')
+    elif remote_str.startswith('git@github.com'):
+        repo = remote_str.rsplit(':', 1)[1].split('/')
         github_user = repo[0]
         github_repo = repo[1]
 
@@ -130,7 +133,7 @@ def make_index_pages(path):
         info = textwrap.dedent(f"""
             # Info
 
-            Author: {username}
+            Author: {username_str}
 
             - This index page is automatically generated with my Python script named [pagenize](https://github.com/sheeputech/pagenize)
             - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
