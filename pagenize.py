@@ -135,7 +135,7 @@ def make_index_pages(path):
 
             Author: {username_str}
 
-            - This index page is automatically generated with my Python script named [pagenize](https://github.com/sheeputech/pagenize)
+            - This index page is automatically generated with my Python script named [albatrosstoi/pagenize](https://github.com/albatrosstoi/pagenize)
             - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
         """)
 
