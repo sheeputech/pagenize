@@ -133,7 +133,7 @@ def make_index_pages(path):
             Author: {username}
 
             - This index page is automatically generated with my Python script named [pagenize](https://github.com/sheeputech/pagenize)
-            - Repository of this page: [GitHub %7C {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
+            - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
         """)
 
         # breadcrumb
