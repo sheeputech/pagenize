@@ -1,6 +1,7 @@
 import click
 import glob
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -32,7 +33,8 @@ def create_docs(ctx, yes):
     else:
         print(f'The following directory will be pagenized: {curdir}')
 
-    # TODO Read config file
+    # Check OS (conditions for directory separator)
+    s = '\\' if platform.system() == 'Windows' else '/'
 
     # Remove docs/
     if os.path.isdir('docs'):
@@ -42,14 +44,14 @@ def create_docs(ctx, yes):
 
     # Search *.html and *.md recursively, except README.md and pagenize/
     origin_paths = [p for p in glob.iglob('./**', recursive=True)
-                    if re.search(r'^(?!.*pagenize)^(?!.*README).*(\.md)', p)]
+                    if re.search(r'^(?!.*pagenize)^(?!.*README).*(\.html|\.md)', p)]
 
     # Create file paths in docs
-    docs_paths = ['docs\\' + p.split('\\', 1)[1] for p in origin_paths]
+    docs_paths = [f'docs{s}' + p.split(s, 1)[1] for p in origin_paths]
 
     # Make dirs
     for path in docs_paths:
-        dirname = path.rsplit('\\', 1)[0]
+        dirname = path.rsplit(s, 1)[0]
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
 
@@ -78,15 +80,15 @@ def create_docs(ctx, yes):
 
     # Make index.md in each dir
     print("Making index pages...")
-    make_index_pages('.\\docs')
+    make_index_pages(f'.{s}docs', curdir, s)
 
     # complete
     print("Successfully completed pagenize.")
 
 
-def make_index_pages(path):
-    username = subprocess.check_output('git config --get user.name')
-    remote = subprocess.check_output('git config --get remote.origin.url')
+def make_index_pages(path, curdir, s):
+    username = subprocess.check_output(['git', 'config', '--get', 'user.name'])
+    remote = subprocess.check_output(['git', 'config', '--get', 'remote.origin.url'])
 
     username_str = str(username).split("'")[1].split('\\n')[0]
     remote_str = str(remote).split("'")[1].split('\\n')[0]
@@ -104,25 +106,24 @@ def make_index_pages(path):
 
     base_url = f'https://{github_user}.github.io/{github_repo}'
 
-    curdir = os.getcwd()
-    inner_path = path.split('.\\', 1)[1]
-    inner_url_path = inner_path.replace('\\', '/').split('docs', 1)[1]
+    inner_path = path.split(f'.{s}', 1)[1]
+    inner_url_path = inner_path.replace(s, '/').split('docs', 1)[1]
 
     urls = {}
     for filename in os.listdir(path):
-        filepath = f'{curdir}\\{inner_path}\\{filename}'
+        filepath = f'{curdir}{s}{inner_path}{s}{filename}'
 
         if os.path.isdir(filepath):
             urls[filename] = f"{base_url}{inner_url_path}/{filename}/index"
 
             # make index pages recursively
-            make_index_pages(f'{path}\\{filename}')
+            make_index_pages(f'{path}{s}{filename}', curdir, s)
 
         elif os.path.isfile(filepath):
             urls[filename] = f"{base_url}{inner_url_path}/{filename.rsplit('.', 1)[0]}"
 
     # Create index.md and write content
-    with open(f'{path}\\index.md', mode='w') as f:
+    with open(f'{path}{s}index.md', mode='w') as f:
         # link to the repository
         info = textwrap.dedent(f"""
             # Info
@@ -134,7 +135,7 @@ def make_index_pages(path):
         """)
 
         # breadcrumb
-        splt = path.split('.\\docs', 1)[1].split('\\')
+        splt = path.split(f'.{s}docs', 1)[1].split(s)
         bc = textwrap.dedent("""
             # {}
         """).format(' / '.join([f"[{splt[i] or 'ROOT'}]({base_url}{'/'.join(splt[0:i+1] + ['index'])})" for i in range(0, len(splt))]))
