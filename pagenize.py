@@ -13,12 +13,6 @@ def pagenize(ctx):
     pass
 
 
-@pagenize.command(help='Configure pagenize.')
-@click.pass_context
-def init(ctx):
-    print('init')
-
-
 @pagenize.command(help='Collect your .html and .md files into docs/ with index pages.')
 @click.option('-y', '--no-ask', 'yes', is_flag=True, help='Answer "yes" automatically.')
 @click.pass_context
