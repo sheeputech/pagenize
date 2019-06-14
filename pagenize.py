@@ -4,7 +4,7 @@ import os
 import platform
 import re
 import shutil
-import subprocess
+from subprocess import check_output
 import textwrap
 
 
@@ -17,7 +17,7 @@ def pagenize(ctx):
 @pagenize.command(help='Collect your .html and .md files into docs/ with index pages.')
 @click.option('-y', '--no-ask', 'yes', is_flag=True, help='Answer "yes" automatically.')
 @click.pass_context
-def create_docs(ctx, yes):
+def makedocs(ctx, yes):
     # Check if there is ".git" directory in current directory
     if os.listdir(path='.').count('.git') == 0:
         print('There is no ".git" directory in this directory.')
@@ -43,11 +43,11 @@ def create_docs(ctx, yes):
         os.remove('docs')
 
     # Search *.html and *.md recursively, except README.md and pagenize/
-    origin_paths = [p for p in glob.iglob('./**', recursive=True)
-                    if re.search(r'^(?!.*pagenize)^(?!.*README).*(\.html|\.md)', p)]
+    r = r'^(?!.*pagenize)^(?!.*README).*(\.html|\.md)'
+    paths = [p for p in glob.iglob('./**', recursive=True) if re.search(r, p)]
 
     # Create file paths in docs
-    docs_paths = [f'docs{s}' + p.split(s, 1)[1] for p in origin_paths]
+    docs_paths = [f'docs{s}' + p.split(s, 1)[1] for p in paths]
 
     # Make dirs
     for path in docs_paths:
@@ -57,8 +57,8 @@ def create_docs(ctx, yes):
 
     # Copy .md files into docs
     print("----- Files will be copied into docs -------------------------------------------------")
-    for i, path in enumerate(origin_paths):
-        print('{}. {}'.format(i, path))
+    for i, path in enumerate(paths):
+        print(f'{i}. {path}')
         shutil.copy2(path, docs_paths[i])
     print("--------------------------------------------------------------------------------------")
 
@@ -87,10 +87,9 @@ def create_docs(ctx, yes):
 
 
 def make_index_pages(path, curdir, s):
-    username = subprocess.check_output(['git', 'config', '--get', 'user.name'])
-    remote = subprocess.check_output(['git', 'config', '--get', 'remote.origin.url'])
-
-    username_str = str(username).split("'")[1].split('\\n')[0]
+    username = check_output(['git', 'config', '--get', 'user.name'])
+    remote = check_output(['git', 'config', '--get', 'remote.origin.url'])
+    username = str(username).split("'")[1].split('\\n')[0]
     remote_str = str(remote).split("'")[1].split('\\n')[0]
 
     github_user = ''
@@ -104,52 +103,49 @@ def make_index_pages(path, curdir, s):
         github_user = repo[0]
         github_repo = repo[1]
 
-    base_url = f'https://{github_user}.github.io/{github_repo}'
-
+    baseurl = f'https://{github_user}.github.io/{github_repo}'
     inner_path = path.split(f'.{s}', 1)[1]
     inner_url_path = inner_path.replace(s, '/').split('docs', 1)[1]
-
     urls = {}
     for filename in os.listdir(path):
         filepath = f'{curdir}{s}{inner_path}{s}{filename}'
 
         if os.path.isdir(filepath):
-            urls[filename] = f"{base_url}{inner_url_path}/{filename}/index"
+            urls[filename] = f"{baseurl}{inner_url_path}/{filename}/index"
 
             # make index pages recursively
             make_index_pages(f'{path}{s}{filename}', curdir, s)
 
         elif os.path.isfile(filepath):
-            urls[filename] = f"{base_url}{inner_url_path}/{filename.rsplit('.', 1)[0]}"
+            urls[filename] = f"{baseurl}{inner_url_path}/{filename.rsplit('.', 1)[0]}"
 
     # Create index.md and write content
     with open(f'{path}{s}index.md', mode='w') as f:
-        # link to the repository
-        info = textwrap.dedent(f"""
-            # Info
+        # breadcrumb
+        bc_li = path.split(f'.{s}docs', 1)[1].split(s)
+        bc_items = ' / '.join(
+            [f"[{bc_li[i] or 'ROOT'}]({baseurl}{'/'.join(bc_li[0:i+1] + ['index'])})" for i in range(0, len(bc_li))])
+        
+        content = f'## {bc_items}\n\n'
 
-            Author: {username_str}
+        # list of the links to child files
+        content += f'***\n\n'
+        content += "".join([f'- [{f}]({url})\n' for f, url in urls.items()])
+
+        # info
+        content += textwrap.dedent(f"""
+            ***
+
+            ## Page Information
+
+            Author: {username}
 
             - This index page is automatically generated with my Python script named [albatrosstoi/pagenize](https://github.com/albatrosstoi/pagenize)
             - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
         """)
 
-        # breadcrumb
-        splt = path.split(f'.{s}docs', 1)[1].split(s)
-        bc = textwrap.dedent("""
-            # {}
-        """).format(' / '.join([f"[{splt[i] or 'ROOT'}]({base_url}{'/'.join(splt[0:i+1] + ['index'])})" for i in range(0, len(splt))]))
-
-        # list of the links to children
-        children = textwrap.dedent("""
-            # Child Files
-
-        """)
-        children += "".join(
-            [f'- [{filename}]({url})\n' for filename, url in urls.items()])
-
         # write contents
-        f.write(info + bc + children)
+        f.write(content)
 
 
 if __name__ == '__main__':
