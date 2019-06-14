@@ -138,10 +138,9 @@ def make_index_pages(path, curdir, s):
 
             ### Page Information
 
-            Author: [{username}](https://github.com/{username})
-
-            - This index page is automatically generated with my Python script named [albatrosstoi/pagenize](https://github.com/albatrosstoi/pagenize)
+            - Author: {username}
             - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
+            - This index page is automatically generated with my Python script named [albatrosstoi/pagenize](https://github.com/albatrosstoi/pagenize)
         """)
 
         # write contents
