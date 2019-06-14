@@ -45,7 +45,6 @@ def makedocs(ctx, yes):
     # Search *.html and *.md recursively, except README.md and pagenize/
     r = r'^(?!.*pagenize)^(?!.*README).*(\.html|\.md)'
     paths = [p for p in iglob('./**', recursive=True) if re.search(r, p)]
-    paths = sorted(paths)
 
     # Create file paths in docs
     docs_paths = [f'docs{s}' + p.split(s, 1)[1] for p in paths]
@@ -109,7 +108,7 @@ def make_index_pages(path, curdir, s):
     inner_path = path.split(f'.{s}', 1)[1]
     inner_url_path = inner_path.replace(s, '/').split('docs', 1)[1]
     urls = {}
-    for filename in os.listdir(path):
+    for filename in sorted(os.listdir(path)):
         filepath = f'{curdir}{s}{inner_path}{s}{filename}'
 
         if os.path.isdir(filepath):
@@ -131,16 +130,15 @@ def make_index_pages(path, curdir, s):
         content = f'## {bc_items}\n\n'
 
         # list of the links to child files
-        content += f'***\n\n'
         content += "".join([f'- [{f}]({url})\n' for f, url in urls.items()])
 
         # info
         content += textwrap.dedent(f"""
             ***
 
-            ## Page Information
+            ### Page Information
 
-            Author: {username}
+            Author: [{username}](https://github.com/{username})
 
             - This index page is automatically generated with my Python script named [albatrosstoi/pagenize](https://github.com/albatrosstoi/pagenize)
             - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
