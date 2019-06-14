@@ -1,10 +1,10 @@
+from glob import glob, iglob
+from subprocess import check_output
 import click
-import glob
 import os
 import platform
 import re
 import shutil
-from subprocess import check_output
 import textwrap
 
 
@@ -44,7 +44,8 @@ def makedocs(ctx, yes):
 
     # Search *.html and *.md recursively, except README.md and pagenize/
     r = r'^(?!.*pagenize)^(?!.*README).*(\.html|\.md)'
-    paths = [p for p in glob.iglob('./**', recursive=True) if re.search(r, p)]
+    paths = [p for p in iglob('./**', recursive=True) if re.search(r, p)]
+    paths = sorted(paths)
 
     # Create file paths in docs
     docs_paths = [f'docs{s}' + p.split(s, 1)[1] for p in paths]
@@ -63,19 +64,20 @@ def makedocs(ctx, yes):
     print("--------------------------------------------------------------------------------------")
 
     # Remove files other than .html and .md in docs/
-    for f in [p for p in glob.glob('./docs/**', recursive=True) if
-              re.search(r'^.*^(?!.*\.html|.*\.md)', p) and os.path.isfile(p)]:
+    r = r'^.*^(?!.*\.html|.*\.md)'
+    for f in [p for p in glob('./docs/**', recursive=True) if re.search(r, p) and os.path.isfile(p)]:
         os.remove(f)
 
     # Remove empty dirs in docs/
     ctn = True
     while ctn:
-        empty_dirs = [p for p in glob.glob('./docs/**', recursive=True)
-                      if os.path.isdir(p) and not os.listdir(p)]
-        if len(empty_dirs) == 0:
+        g = './docs/**'
+        e = [p for p in glob(g, recursive=True)
+             if os.path.isdir(p) and not os.listdir(p)]
+        if len(e) == 0:
             ctn = False
         else:
-            for d in empty_dirs:
+            for d in e:
                 os.rmdir(d)
 
     # Make index.md in each dir
@@ -125,7 +127,7 @@ def make_index_pages(path, curdir, s):
         bc_li = path.split(f'.{s}docs', 1)[1].split(s)
         bc_items = ' / '.join(
             [f"[{bc_li[i] or 'ROOT'}]({baseurl}{'/'.join(bc_li[0:i+1] + ['index'])})" for i in range(0, len(bc_li))])
-        
+
         content = f'## {bc_items}\n\n'
 
         # list of the links to child files
