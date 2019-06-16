@@ -1,6 +1,7 @@
 from glob import glob, iglob
 from subprocess import check_output
 import click
+import configparser
 import os
 import platform
 import re
@@ -43,7 +44,16 @@ def makedocs(ctx, yes):
         os.remove('docs')
 
     # Search *.html and *.md recursively, except README.md and pagenize/
-    r = r'^(?!.*pagenize)^(?!.*README).*(\.html|\.md)'
+    r = r'^(?!.*README).*(\.html|\.md)'
+
+    # Try reading config file
+    conf = configparser.ConfigParser()
+    conf.read('pagenize.ini')
+    try:
+        r = conf.get('makedocs', 'exclude_regex')
+    except configparser.Error as e:
+        print('No config file was found.')
+
     paths = [p for p in iglob('./**', recursive=True) if re.search(r, p)]
 
     # Create file paths in docs
