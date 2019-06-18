@@ -67,17 +67,19 @@ def makedocs(ctx, yes):
 
     # Copy .md files into docs
     print("----- Files will be copied into docs -------------------------------------------------")
-    for i, path in enumerate(paths):
-        print(f'{i}. {path}')
-        shutil.copy2(path, docs_paths[i])
+    [print(f'{i}. {f}') for i, f in enumerate(paths)]
     print("--------------------------------------------------------------------------------------")
 
-    # Remove files other than .html and .md in docs/
-    r = r'^.*^(?!.*\.html|.*\.md)'
-    for f in [p for p in glob('./docs/**', recursive=True) if re.search(r, p) and os.path.isfile(p)]:
-        os.remove(f)
+    print("Copying files to docs...")
+    [shutil.copy2(f, docs_paths[i]) for i, f in enumerate(paths)]
+    print("Completed.")
 
-    # Remove empty dirs in docs/
+    # Remove unnecessary files from docs/
+    r = r'^.*^(?!.*\.html|.*\.md)'
+    files = glob('./docs/**', recursive=True)
+    [os.remove(f) for f in files if re.search(r, f) and os.path.isfile(f)]
+
+    # Remove unnecessary dirs from docs/
     ctn = True
     while ctn:
         g = './docs/**'
@@ -92,9 +94,10 @@ def makedocs(ctx, yes):
     # Make index.md in each dir
     print("Making index pages...")
     make_index_pages(f'.{s}docs', curdir, s)
+    print("Completed.")
 
     # complete
-    print("Successfully completed pagenize.")
+    print("Pagenizing successfully completed.")
 
 
 def make_index_pages(path, curdir, s):
