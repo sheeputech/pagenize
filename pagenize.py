@@ -67,7 +67,7 @@ def makedocs(ctx, yes):
 
     # Copy .md files into docs
     print("----- Files will be copied into docs -------------------------------------------------")
-    [print(f'{i}. {f}') for i, f in enumerate(paths)]
+    [print(f'{i:02}. {f}') for i, f in enumerate(paths)]
     print("--------------------------------------------------------------------------------------")
 
     print("Copying files to docs...")
