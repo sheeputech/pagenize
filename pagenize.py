@@ -7,6 +7,7 @@ import platform
 import re
 import shutil
 import textwrap
+import tqdm
 
 
 @click.group(help='pagenize')
@@ -71,7 +72,11 @@ def makedocs(ctx, yes):
     print("--------------------------------------------------------------------------------------")
 
     print("Copying files to docs...")
-    [shutil.copy2(f, docs_paths[i]) for i, f in enumerate(paths)]
+    pbar = tqdm.tqdm(total=len(paths))
+    for i, f in enumerate(paths):
+        shutil.copy2(f, docs_paths[i])
+        pbar.update(1)
+    pbar.close()
     print("Completed.")
 
     # Remove unnecessary files from docs/
