@@ -32,6 +32,8 @@ def make(ctx, yes):
         if input('Do you pagenize this directory? (y/N): ') != 'y':
             print('Pagenize aborted.')
             return
+    else:
+        print(f'The following directory will be pagenized: {curdir}')
 
     # Check OS (conditions for directory separator)
     s = '\\' if platform.system() == 'Windows' else '/'
@@ -91,7 +93,7 @@ def make(ctx, yes):
     print("Completed.")
 
     # complete
-    print("\nPagenizing successfully completed.")
+    print("Pagenizing successfully completed.")
 
 
 def make_index_pages(path, curdir, s):
