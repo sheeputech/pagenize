@@ -5,7 +5,7 @@ import configparser
 import os
 import platform
 import re
-import shutil
+from shutil import rmtree, copy2
 import textwrap
 import tqdm
 
@@ -40,7 +40,7 @@ def makedocs(ctx, yes):
 
     # Remove docs/
     if os.path.isdir('docs'):
-        shutil.rmtree('docs')
+        rmtree('docs')
     elif os.path.isfile('docs'):
         os.remove('docs')
 
@@ -58,26 +58,17 @@ def makedocs(ctx, yes):
     paths = [p for p in iglob('./**', recursive=True) if re.search(r, p)]
 
     # Create file paths in docs
-    docs_paths = [f'docs{s}' + p.split(s, 1)[1] for p in paths]
+    docs = [f'docs{s}' + p.split(s, 1)[1] for p in paths]
 
     # Make dirs
-    for path in docs_paths:
+    for path in docs:
         dirname = path.rsplit(s, 1)[0]
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
 
     # Copy .md files into docs
-    print("----- Files will be copied into docs -------------------------------------------------")
-    [print(f'{i:02}. {f}') for i, f in enumerate(paths)]
-    print("--------------------------------------------------------------------------------------")
-
-    print("Copying files to docs...")
-    pbar = tqdm.tqdm(total=len(paths))
-    for i, f in enumerate(paths):
-        shutil.copy2(f, docs_paths[i])
-        pbar.update(1)
-    pbar.close()
-    print("Completed.")
+    pf = 'Copying file: {}'
+    [[print(pf.format(f)), copy2(f, docs[i])] for i, f in enumerate(paths)]
 
     # Remove unnecessary files from docs/
     r = r'^.*^(?!.*\.html|.*\.md)'
