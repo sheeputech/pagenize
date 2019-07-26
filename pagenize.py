@@ -1,11 +1,14 @@
 from glob import glob, iglob
+from shutil import rmtree, copy2
+from string import Template
 from subprocess import check_output
+from termcolor import colored
 import click
 import configparser
+import copy
 import os
 import platform
 import re
-from shutil import rmtree, copy2
 import textwrap
 import tqdm
 
@@ -20,21 +23,17 @@ def pagenize(ctx):
 @click.option('-y', '--no-ask', 'yes', is_flag=True, help='Answer "yes" automatically.')
 @click.pass_context
 def make(ctx, yes):
-    # Check if there is ".git" directory in current directory
-    if os.listdir(path='.').count('.git') == 0:
-        print('There is no ".git" directory in this directory.')
+    if is_git_repo():
+        log('This is not a git repository.', 'error')
         return
 
     # Confirmation
-    curdir = os.getcwd()
+    cwd = os.getcwd()
     if not yes:
-        print(f'Current directory is: {curdir}')
-        if input('Do you pagenize this directory? (y/N): ') != 'y':
-            print('Pagenize aborted.')
-            return
-
-    # Check OS (conditions for directory separator)
-    s = '\\' if platform.system() == 'Windows' else '/'
+        log(f'Current directory is: {cwd}', 'primary')
+        if input('--> Do you pagenize this directory? (y/N): ') != 'y':
+            log('Pagenize aborted.')
+            exit
 
     # Remove docs/
     if os.path.isdir('docs'):
@@ -42,116 +41,146 @@ def make(ctx, yes):
     elif os.path.isfile('docs'):
         os.remove('docs')
 
-    # Search *.html and *.md recursively, except README.md and pagenize/
-    r = r'^(?!.*README).*(\.html|\.md)'
-
-    # Try reading config file
-    conf = configparser.ConfigParser()
-    conf.read('pagenize.ini')
-    try:
-        r = conf.get('makedocs', 'exclude_regex')
-    except configparser.Error as e:
-        print('No config file was found.')
-
-    paths = [p for p in iglob('./**', recursive=True) if re.search(r, p)]
-
-    # Create file paths in docs
-    docs = [f'docs{s}' + p.split(s, 1)[1] for p in paths]
+    # Search files
+    search_re = get_search_regex()
+    sep = get_path_sep()
+    paths = [
+        (v, f'docs{sep}{v.split(sep, 1)[1]}') for v in iglob('./**', recursive=True) if re.search(search_re, v)
+    ]
+    _, paths_dest = list(zip(*paths))
 
     # Make dirs
-    for path in docs:
-        dirname = path.rsplit(s, 1)[0]
+    for p in paths_dest:
+        dirname = p.rsplit(sep, 1)[0]
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
 
-    # Copy .md files into docs
-    pf = 'Copying file: {}'
-    [[print(pf.format(f)), copy2(f, docs[i])] for i, f in enumerate(paths)]
+    # Copy files into docs
+    [(log(f'{f} -> {t}', 'primary'), copy2(f, t)) for f, t in paths]
 
-    # Remove unnecessary files from docs/
-    r = r'^.*^(?!.*\.html|.*\.md)'
-    files = glob('./docs/**', recursive=True)
-    [os.remove(f) for f in files if re.search(r, f) and os.path.isfile(f)]
-
-    # Remove unnecessary dirs from docs/
-    ctn = True
-    while ctn:
-        g = './docs/**'
-        e = [p for p in glob(g, recursive=True)
-             if os.path.isdir(p) and not os.listdir(p)]
-        if len(e) == 0:
-            ctn = False
-        else:
-            for d in e:
-                os.rmdir(d)
-
-    # Make index.md in each dir
-    print("\nMaking index pages...")
-    make_index_pages(f'.{s}docs', curdir, s)
-    print("Completed.")
-
-    # complete
-    print("\nPagenizing successfully completed.")
+    # Make index.md for each dir in docs/
+    log("Making index pages...")
+    # write_index(sep.join(['.', 'docs']), sep)
+    make_index(['.', 'docs'], sep)
+    log("Completed.")
 
 
-def make_index_pages(path, curdir, s):
-    username = check_output(['git', 'config', '--get', 'user.name'])
-    remote = check_output(['git', 'config', '--get', 'remote.origin.url'])
-    username = str(username).split("'")[1].split('\\n')[0]
-    remote_str = str(remote).split("'")[1].split('\\n')[0]
+def is_git_repo() -> bool:
+    """
+    Check if current directory is a git repository or not.
+    """
 
-    github_user = ''
-    github_repo = ''
-    if remote_str.startswith('https://github.com'):
-        repo = remote_str.rsplit('/')[-2:]
-        github_user = repo[0]
-        github_repo = repo[1]
-    elif remote_str.startswith('git@github.com'):
-        repo = remote_str.rsplit(':', 1)[1].split('/')
-        github_user = repo[0]
-        github_repo = repo[1]
+    return os.listdir(path='.').count('.git') == 0
 
-    baseurl = f'https://{github_user}.github.io/{github_repo}'
-    inner_path = path.split(f'.{s}', 1)[1]
-    inner_url_path = inner_path.replace(s, '/').split('docs', 1)[1]
+
+def get_path_sep() -> str:
+    """
+    Return file path separator for each operation systems.
+    """
+
+    return '\\' if platform.system() == 'Windows' else '/'
+
+
+def get_search_regex():
+    PAGENIZE_SECTION_PAGENIZE = 'pagenize'
+    PAGENIZE_OPTION_SEARCH_REGEX = 'search_regex'
+
+    if os.path.isfile('pagenize.ini'):
+        conf = configparser.ConfigParser()
+        conf.read('pagenize.ini')
+        if conf.has_section(PAGENIZE_SECTION_PAGENIZE) and conf.has_option(PAGENIZE_SECTION_PAGENIZE, PAGENIZE_OPTION_SEARCH_REGEX):
+            r = conf[PAGENIZE_SECTION_PAGENIZE][PAGENIZE_OPTION_SEARCH_REGEX]
+            return repr(r)[1:-1]
+
+    return r'^(?!.*README).*(\.html|\.md)$'
+
+
+def make_index(path: list, sep: str):
+    git_user, git_repo = get_repo_info()
+    base = f'https://{git_user}.github.io/{git_repo}'
+    inner = path[2:] if len(path) > 2 else []
     urls = {}
-    for filename in sorted(os.listdir(path)):
-        filepath = f'{curdir}{s}{inner_path}{s}{filename}'
+    for file in sorted(os.listdir(sep.join(path))):
+        nextpath = copy.copy(path)
+        nextpath.append(file)
+        if os.path.isdir(sep.join(nextpath)):
+            urls[file] = '/'.join([base, *inner, file, 'index'])
+            make_index(nextpath, sep)
+        elif os.path.isfile(sep.join(nextpath)):
+            urls[file] = '/'.join([base, *inner, file])
 
-        if os.path.isdir(filepath):
-            urls[filename] = f"{baseurl}{inner_url_path}/{filename}/index"
+    index_path = sep.join([path, 'index.md'])
+    write_index_page(path, inner, urls)
 
-            # make index pages recursively
-            make_index_pages(f'{path}{s}{filename}', curdir, s)
 
-        elif os.path.isfile(filepath):
-            urls[filename] = f"{baseurl}{inner_url_path}/{filename.rsplit('.', 1)[0]}"
+def write_index_page(index_path: str, inner_paths: list, urls: list):
+    # Read template file
+    tmplstr = """
+    ## $breadcrumb
 
-    # Create index.md and write content
-    with open(f'{path}{s}index.md', mode='w') as f:
+    $index_items
+
+    ## Page Information
+
+    - Source of this page is in this repository: $repo
+    - This index page is automatically generated with [sheeputech/cli-pagenize](https://github.com/sheeputech/cli-pagenize)
+    """
+
+    PAGENIZE_TMPL_PATH = 'pagenize.tmpl.md'
+    if os.path.isfile(PAGENIZE_TMPL_PATH):
+        tmpl = open(PAGENIZE_TMPL_PATH, 'r')
+        tmplstr = tmpl.read()
+
+    with open(index_path, mode='w') as f:
         # breadcrumb
-        bc_li = path.split(f'.{s}docs', 1)[1].split(s)
-        bc_items = ' / '.join(
-            [f"[{bc_li[i] or 'ROOT'}]({baseurl}{'/'.join(bc_li[0:i+1] + ['index'])})" for i in range(0, len(bc_li))])
-
+        breadcrumb = ' / '.join(['root', *inner_paths])
         content = f'## {bc_items}\n\n'
 
-        # list of the links to child files
-        content += "".join([f'- [{f}]({url})\n' for f, url in urls.items()])
+    #     # list of the links to child files
+    #     content += "".join([f'- [{f}]({url})\n' for f, url in urls.items()])
 
-        # info
-        content += textwrap.dedent(f"""
-            ***
+    #     # info
+    #     content += textwrap.dedent(f"""
+    #         ***
 
-            ### Page Information
+    #         # Page Information
 
-            - Author: {username}
-            - Repository of this page: [GitHub \| {github_user}/{github_repo}](https://github.com/{github_user}/{github_repo}),
-            - This index page is automatically generated with my Python script named [albatrosstoi/pagenize](https://github.com/albatrosstoi/pagenize)
-        """)
+    #         - GitHub Repository: [{user}/{repo}](https://github.com/{user}/{repo}),
+    #         - This index page is automatically generated with [sheeputech/cli-pagenize](https://github.com/sheeputech/cli-pagenize)
+    #     """)
 
-        # write contents
-        f.write(content)
+    #     # write contents
+    #     f.write(content)
+
+
+def get_repo_info():
+    o = check_output('git config --get remote.origin.url'.split(' '))
+    remote = str(o).split("'")[1].split('\\n')[0]
+    if remote.startswith('https://'):
+        repo = remote.rsplit('/')[-2:]
+    elif remote.startswith('git@'):
+        repo = remote.rsplit(':', 1)[1].split('/')
+    else:
+        log('Unexpected remote repository url', 'error')
+        exit
+    return repo[0], repo[1]
+
+
+def log(mes: str, log_type: str = None):
+    if log_type == 'primary':
+        prefix = ''
+        color = 'green'
+    elif log_type == 'warn':
+        prefix = 'Warn: '
+        color = 'yellow'
+    elif log_type == 'error':
+        prefix = 'Error: '
+        color = 'red'
+    else:
+        prefix = ''
+        color = 'grey'
+
+    print(colored(f'{prefix}{mes}', color))
 
 
 if __name__ == '__main__':
