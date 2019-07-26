@@ -3,14 +3,18 @@ from shutil import rmtree, copy2
 from string import Template
 from subprocess import check_output
 from termcolor import colored
+from textwrap import dedent
 import click
 import configparser
 import copy
 import os
 import platform
 import re
-import textwrap
 import tqdm
+
+PAGENIZE_CONFIG_SECTION = 'pagenize'
+PAGENIZE_CONFIG_OPTION_SEARCH_INDEX = 'search_regex'
+PAGENIZE_TEMPLATE_FILENAME = 'pagenize.tmpl.md'
 
 
 @click.group(help='pagenize')
@@ -82,17 +86,14 @@ def get_path_sep() -> str:
 
 
 def get_search_regex():
-    PAGENIZE_SECTION_PAGENIZE = 'pagenize'
-    PAGENIZE_OPTION_SEARCH_REGEX = 'search_regex'
-
     if os.path.isfile('pagenize.ini'):
         conf = configparser.ConfigParser()
         conf.read('pagenize.ini')
-        if conf.has_section(PAGENIZE_SECTION_PAGENIZE) and conf.has_option(PAGENIZE_SECTION_PAGENIZE, PAGENIZE_OPTION_SEARCH_REGEX):
-            r = conf[PAGENIZE_SECTION_PAGENIZE][PAGENIZE_OPTION_SEARCH_REGEX]
-            return repr(r)[1:-1]
+        if conf.has_section(PAGENIZE_CONFIG_SECTION) and conf.has_option(PAGENIZE_CONFIG_SECTION, PAGENIZE_CONFIG_OPTION_SEARCH_INDEX):
+            r = conf[PAGENIZE_CONFIG_SECTION][PAGENIZE_CONFIG_OPTION_SEARCH_INDEX]
+            return r
 
-    return r'^(?!.*README).*(\.html|\.md)$'
+    return r'^(?!.*(README|pagenize)).*(html|md)$'
 
 
 def make_index(path: list, sep: str):
@@ -109,48 +110,52 @@ def make_index(path: list, sep: str):
         elif os.path.isfile(sep.join(nextpath)):
             urls[file] = '/'.join([base, *inner, file])
 
-    index_path = sep.join([path, 'index.md'])
-    write_index_page(path, inner, urls)
+    index_path = sep.join([*path, 'index.md'])
+    write_index_page(index_path, inner, urls, git_user, git_repo, base)
 
 
-def write_index_page(index_path: str, inner_paths: list, urls: list):
+def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: str, git_repo: str, base: str):
+    # Breadcrumb
+    labs = ['root', *inner_paths]
+    links = ['[{}]({})'.format(f, '{base}/{path}'.format(base=base, path='/'.join(labs[1:i+1])))
+             for i, f in enumerate(labs)]
+    breadcrumb = ' / '.join(links)
+
+    # Index items
+    items = "".join([f'- [{f}]({url})\n' for f, url in urls.items()])
+
+    # Source repository URL
+    repo = f'[{git_user}/{git_repo}](https://github.com/{git_user}/{git_repo})'
+
+    # Set default template string
+    tmpl_str = dedent("""
+        ## $breadcrumb
+
+        $indices
+
+        ***
+
+        ### Page Information
+
+        - Source of this page is in this repository: $repo
+        - This index page is automatically generated with [sheeputech/cli-pagenize](https://github.com/sheeputech/cli-pagenize)
+    """)
+
     # Read template file
-    tmplstr = """
-    ## $breadcrumb
+    if os.path.isfile(PAGENIZE_TEMPLATE_FILENAME):
+        tmpl_str = open(PAGENIZE_TEMPLATE_FILENAME, 'r').read()
 
-    $index_items
-
-    ## Page Information
-
-    - Source of this page is in this repository: $repo
-    - This index page is automatically generated with [sheeputech/cli-pagenize](https://github.com/sheeputech/cli-pagenize)
-    """
-
-    PAGENIZE_TMPL_PATH = 'pagenize.tmpl.md'
-    if os.path.isfile(PAGENIZE_TMPL_PATH):
-        tmpl = open(PAGENIZE_TMPL_PATH, 'r')
-        tmplstr = tmpl.read()
-
-    with open(index_path, mode='w') as f:
-        # breadcrumb
-        breadcrumb = ' / '.join(['root', *inner_paths])
-        content = f'## {bc_items}\n\n'
-
-    #     # list of the links to child files
-    #     content += "".join([f'- [{f}]({url})\n' for f, url in urls.items()])
-
-    #     # info
-    #     content += textwrap.dedent(f"""
-    #         ***
-
-    #         # Page Information
-
-    #         - GitHub Repository: [{user}/{repo}](https://github.com/{user}/{repo}),
-    #         - This index page is automatically generated with [sheeputech/cli-pagenize](https://github.com/sheeputech/cli-pagenize)
-    #     """)
-
-    #     # write contents
-    #     f.write(content)
+    tmpl = Template(tmpl_str)
+    try:
+        content = tmpl.substitute({
+            'breadcrumb': breadcrumb,
+            'indices': items,
+            'repo': repo
+        })
+        open(index_path, 'w').write(content)
+    except KeyError as e:
+        log(f'The template value {e} is not defined.', 'error')
+        exit
 
 
 def get_repo_info():
