@@ -1,16 +1,15 @@
+from configparser import ConfigParser
 from glob import glob, iglob
 from shutil import rmtree, copy2
-from string import Template
-from subprocess import check_output
 from termcolor import colored
 from textwrap import dedent
 import click
-import configparser
 import copy
 import os
 import platform
 import re
-import tqdm
+import string
+import subprocess
 
 PAGENIZE_CONFIG_SECTION = 'pagenize'
 PAGENIZE_CONFIG_OPTION_SEARCH_INDEX = 'search_regex'
@@ -87,7 +86,7 @@ def get_path_sep() -> str:
 
 def get_search_regex():
     if os.path.isfile('pagenize.ini'):
-        conf = configparser.ConfigParser()
+        conf = ConfigParser()
         conf.read('pagenize.ini')
         if conf.has_section(PAGENIZE_CONFIG_SECTION) and conf.has_option(PAGENIZE_CONFIG_SECTION, PAGENIZE_CONFIG_OPTION_SEARCH_INDEX):
             r = conf[PAGENIZE_CONFIG_SECTION][PAGENIZE_CONFIG_OPTION_SEARCH_INDEX]
@@ -145,7 +144,7 @@ def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: s
     if os.path.isfile(PAGENIZE_TEMPLATE_FILENAME):
         tmpl_str = open(PAGENIZE_TEMPLATE_FILENAME, 'r').read()
 
-    tmpl = Template(tmpl_str)
+    tmpl = string.Template(tmpl_str)
     try:
         content = tmpl.substitute({
             'breadcrumb': breadcrumb,
@@ -159,7 +158,8 @@ def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: s
 
 
 def get_repo_info():
-    o = check_output('git config --get remote.origin.url'.split(' '))
+    o = subprocess.check_output(
+        ['git', 'config', '--get', 'remote.origin.url'])
     remote = str(o).split("'")[1].split('\\n')[0]
     if remote.startswith('https://'):
         repo = remote.rsplit('/')[-2:]
