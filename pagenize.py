@@ -26,14 +26,14 @@ def pagenize(ctx):
 @click.option('-y', '--no-ask', 'yes', is_flag=True, help='Answer "yes" automatically.')
 @click.pass_context
 def make(ctx, yes):
-    if is_git_repo():
+    if not is_git_repo():
         log('This is not a git repository.', 'error')
-        return
+        exit
 
     # Confirmation
     cwd = os.getcwd()
     if not yes:
-        log(f'Current directory is: {cwd}', 'primary')
+        log(f'Current directory is: {cwd}', 'primary', False)
         if input('--> Do you pagenize this directory? (y/N): ') != 'y':
             log('Pagenize aborted.')
             exit
@@ -59,7 +59,7 @@ def make(ctx, yes):
             os.makedirs(dirname)
 
     # Copy files into docs
-    [(log(f'{f} -> {t}', 'primary'), copy2(f, t)) for f, t in paths]
+    [(log(f'{f} -> {t}', 'primary', False), copy2(f, t)) for f, t in paths]
 
     # Make index.md for each dir in docs/
     log("Making index pages...")
@@ -73,7 +73,7 @@ def is_git_repo() -> bool:
     Check if current directory is a git repository or not.
     """
 
-    return os.listdir(path='.').count('.git') == 0
+    return os.listdir(path='.').count('.git') == 1
 
 
 def get_path_sep() -> str:
@@ -142,7 +142,8 @@ def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: s
 
     # Read template file
     if os.path.isfile(PAGENIZE_TEMPLATE_FILENAME):
-        tmpl_str = open(PAGENIZE_TEMPLATE_FILENAME, 'r').read()
+        with open(PAGENIZE_TEMPLATE_FILENAME, 'r') as f:
+            tmpl_str = f.read()
 
     tmpl = string.Template(tmpl_str)
     try:
@@ -151,9 +152,12 @@ def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: s
             'indices': items,
             'repo': repo
         })
-        open(index_path, 'w').write(content)
+        with open(index_path, 'w') as f:
+            f.write(content)
+
+        log(f'{index_path} was successfully generated.', 'primary', False)
     except KeyError as e:
-        log(f'The template value {e} is not defined.', 'error')
+        log(f'The template value {e} is not defined.',  'error')
         exit
 
 
@@ -171,21 +175,23 @@ def get_repo_info():
     return repo[0], repo[1]
 
 
-def log(mes: str, log_type: str = None):
-    if log_type == 'primary':
+def log(mes: str, logtype: str = None, brankline: bool = True):
+    if logtype == 'primary':
         prefix = ''
         color = 'green'
-    elif log_type == 'warn':
+    elif logtype == 'warn':
         prefix = 'Warn: '
         color = 'yellow'
-    elif log_type == 'error':
+    elif logtype == 'error':
         prefix = 'Error: '
         color = 'red'
     else:
-        prefix = ''
-        color = 'grey'
+        print('\n', mes, '\n') if brankline else print(mes)
+        return
 
-    print(colored(f'{prefix}{mes}', color))
+    mes = colored(f'{prefix}{mes}', color)
+    print('\n', mes, '\n') if brankline else print(mes)
+    return
 
 
 if __name__ == '__main__':
