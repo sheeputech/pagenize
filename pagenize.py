@@ -63,8 +63,9 @@ def make(ctx, yes):
 
     # Make index.md for each dir in docs/
     log("Making index pages...")
-    # write_index(sep.join(['.', 'docs']), sep)
-    make_index(['.', 'docs'], sep)
+
+    [log(v, "primary", False) for v in make_index(['.', 'docs'], sep)]
+
     log("Completed.")
 
 
@@ -95,22 +96,28 @@ def get_search_regex():
     return r'^(?!.*(README|pagenize)).*(html|md)$'
 
 
-def make_index(path: list, sep: str):
+def make_index(path: list, sep: str, index_list: list = []):
     git_user, git_repo = get_repo_info()
     base = f'https://{git_user}.github.io/{git_repo}'
-    inner = path[2:] if len(path) > 2 else []
+    dirdepth = len(path) - 2
+    inner = path[2:] if dirdepth > 2 else[]
+
+    index_path = sep.join([*path, 'index.md'])
+    index_list.append(index_path)
+
     urls = {}
     for file in sorted(os.listdir(sep.join(path))):
         nextpath = copy.copy(path)
         nextpath.append(file)
         if os.path.isdir(sep.join(nextpath)):
             urls[file] = '/'.join([base, *inner, file, 'index'])
-            make_index(nextpath, sep)
+            make_index(nextpath, sep, index_list=index_list)
         elif os.path.isfile(sep.join(nextpath)):
             urls[file] = '/'.join([base, *inner, file])
 
-    index_path = sep.join([*path, 'index.md'])
     write_index_page(index_path, inner, urls, git_user, git_repo, base)
+
+    return index_list
 
 
 def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: str, git_repo: str, base: str):
@@ -154,8 +161,6 @@ def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: s
         })
         with open(index_path, 'w') as f:
             f.write(content)
-
-        log(f'{index_path} was successfully generated.', 'primary', False)
     except KeyError as e:
         log(f'The template value {e} is not defined.',  'error')
         exit
@@ -186,11 +191,11 @@ def log(mes: str, logtype: str = None, brankline: bool = True):
         prefix = 'Error: '
         color = 'red'
     else:
-        print('\n', mes, '\n') if brankline else print(mes)
+        print('\n', mes, '\n', flush=True) if brankline else print(mes, flush=True)
         return
 
     mes = colored(f'{prefix}{mes}', color)
-    print('\n', mes, '\n') if brankline else print(mes)
+    print('\n', mes, '\n', flush=True) if brankline else print(mes, flush=True)
     return
 
 
