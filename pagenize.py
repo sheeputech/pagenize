@@ -10,6 +10,7 @@ import platform
 import re
 import string
 import subprocess
+import sys
 
 PAGENIZE_CONFIG_SECTION = 'pagenize'
 PAGENIZE_CONFIG_OPTION_SEARCH_INDEX = 'search_regex'
@@ -28,7 +29,7 @@ def pagenize(ctx):
 def make(ctx, yes):
     if not is_git_repo():
         log('This is not a git repository.', 'error')
-        exit
+        sys.exit()
 
     # Confirmation
     cwd = os.getcwd()
@@ -36,7 +37,7 @@ def make(ctx, yes):
         log(f'Current directory is: {cwd}', 'primary', False)
         if input('--> Do you pagenize this directory? (y/N): ') != 'y':
             log('Pagenize aborted.')
-            exit
+            sys.exit()
 
     # Remove docs/
     if os.path.isdir('docs'):
@@ -163,7 +164,7 @@ def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: s
             f.write(content)
     except KeyError as e:
         log(f'The template value {e} is not defined.',  'error')
-        exit
+        sys.exit()
 
 
 def get_repo_info():
@@ -176,7 +177,8 @@ def get_repo_info():
         repo = remote.rsplit(':', 1)[1].split('/')
     else:
         log('Unexpected remote repository url', 'error')
-        exit
+        sys.exit()
+
     return repo[0], repo[1]
 
 
