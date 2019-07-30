@@ -102,6 +102,10 @@ def get_search_regex():
 
 
 def make_index(path_list: list, sep: str, index_list: list = []):
+    """
+    Make files for index pages.
+    """
+
     git_user, git_repo = get_repo_info()
     p_base = f'https://{git_user}.github.io/{git_repo}'
     p_inner = path_list[2:] if len(path_list) > 2 else []
@@ -126,6 +130,10 @@ def make_index(path_list: list, sep: str, index_list: list = []):
 
 
 def write_index(index_path: str, inner_paths: list, urls: list, git_user: str, git_repo: str, base: str):
+    """
+    Write index file.
+    """
+
     # Set default template string
     tmpl_str = dedent("""
         ## $breadcrumb
@@ -163,6 +171,10 @@ def write_index(index_path: str, inner_paths: list, urls: list, git_user: str, g
 
 
 def make_index_breadcrumb(base, inner_list):
+    """
+    Make breadcrumb component for index page.
+    """
+
     # Make link title list
     labs = ['root', *inner_list]
 
@@ -176,6 +188,10 @@ def make_index_breadcrumb(base, inner_list):
 
 
 def make_index_items(file_links):
+    """
+    Make link items component for index page.
+    """
+
     items = "".join([f'- [{f}]({l})\n' for f, l in file_links.items()])
 
     # Remove the last line feed
@@ -183,10 +199,18 @@ def make_index_items(file_links):
 
 
 def make_index_repo(user, repo):
+    """
+    Make repository info component for index page.
+    """
+
     return f'[{user}/{repo}](https://github.com/{user}/{repo})'
 
 
 def get_repo_info():
+    """
+    Get repository username and repository name
+    """
+
     output = sp.check_output('git config --get remote.origin.url'.split(' '))
     remote = str(output).split("'")[1].split('\\n')[0]
     if remote.startswith('https://'):
@@ -201,6 +225,10 @@ def get_repo_info():
 
 
 def log(mes: str, logtype: str = None, bl: bool = True):
+    """
+    Logging util.
+    """
+
     if logtype == 'primary':
         prefix = ''
         color = 'green'
