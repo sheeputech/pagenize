@@ -6,10 +6,11 @@ from textwrap import dedent
 import click
 import copy
 import os
+# import pagenizer
 import platform
 import re
 import string
-import subprocess
+import subprocess as sp
 import sys
 
 PAGENIZE_CONFIG_SECTION = 'pagenize'
@@ -34,8 +35,7 @@ def make(ctx, yes):
     # Confirmation
     cwd = os.getcwd()
     if not yes:
-        log(f'Current directory is: {cwd}', 'primary', False)
-        if input('--> Do you pagenize this directory? (y/N): ') != 'y':
+        if input(f'--> Do you pagenize "{cwd}" ? (y/N): ') != 'y':
             log('Pagenize aborted.')
             sys.exit()
 
@@ -46,10 +46,10 @@ def make(ctx, yes):
         os.remove('docs')
 
     # Search files
-    search_re = get_search_regex()
+    sre = get_search_regex()
     sep = get_path_sep()
     paths = [
-        (v, f'docs{sep}{v.split(sep, 1)[1]}') for v in iglob('./**', recursive=True) if re.search(search_re, v)
+        (v, f'docs{sep}{v.split(sep, 1)[1]}') for v in iglob('./**', recursive=True) if re.search(sre, v)
     ]
     _, paths_dest = list(zip(*paths))
 
@@ -87,6 +87,10 @@ def get_path_sep() -> str:
 
 
 def get_search_regex():
+    """
+    Return regex for searching files.
+    """
+
     if os.path.isfile('pagenize.ini'):
         conf = ConfigParser()
         conf.read('pagenize.ini')
@@ -97,43 +101,31 @@ def get_search_regex():
     return r'^(?!.*(README|pagenize)).*(html|md)$'
 
 
-def make_index(path: list, sep: str, index_list: list = []):
+def make_index(path_list: list, sep: str, index_list: list = []):
     git_user, git_repo = get_repo_info()
-    base = f'https://{git_user}.github.io/{git_repo}'
-    dirdepth = len(path) - 2
-    inner = path[2:] if dirdepth > 2 else[]
+    p_base = f'https://{git_user}.github.io/{git_repo}'
+    p_inner = path_list[2:] if len(path_list) > 2 else []
 
-    index_path = sep.join([*path, 'index.md'])
+    index_path = sep.join([*path_list, 'index.md'])
     index_list.append(index_path)
 
-    urls = {}
-    for file in sorted(os.listdir(sep.join(path))):
-        nextpath = copy.copy(path)
-        nextpath.append(file)
-        if os.path.isdir(sep.join(nextpath)):
-            urls[file] = '/'.join([base, *inner, file, 'index'])
-            make_index(nextpath, sep, index_list=index_list)
-        elif os.path.isfile(sep.join(nextpath)):
-            urls[file] = '/'.join([base, *inner, file])
+    links = {}
+    for file in sorted(os.listdir(sep.join(path_list))):
+        child = copy.copy(path_list)
+        child.append(file)
 
-    write_index_page(index_path, inner, urls, git_user, git_repo, base)
+        # Remove file extension: Prevent browsers from displaying raw source codes of Markdown
+        file_name = file.rsplit('.', 1)[0]
+        links[file] = '/'.join([p_base, *p_inner, file_name])
+        if os.path.isdir(sep.join(child)):
+            make_index(child, sep, index_list=index_list)
+
+    write_index(index_path, p_inner, links, git_user, git_repo, p_base)
 
     return index_list
 
 
-def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: str, git_repo: str, base: str):
-    # Breadcrumb
-    labs = ['root', *inner_paths]
-    links = ['[{}]({})'.format(f, '{base}/{path}'.format(base=base, path='/'.join(labs[1:i+1])))
-             for i, f in enumerate(labs)]
-    breadcrumb = ' / '.join(links)
-
-    # Index items
-    items = "".join([f'- [{f}]({url})\n' for f, url in urls.items()])
-
-    # Source repository URL
-    repo = f'[{git_user}/{git_repo}](https://github.com/{git_user}/{git_repo})'
-
+def write_index(index_path: str, inner_paths: list, urls: list, git_user: str, git_repo: str, base: str):
     # Set default template string
     tmpl_str = dedent("""
         ## $breadcrumb
@@ -153,24 +145,50 @@ def write_index_page(index_path: str, inner_paths: list, urls: list, git_user: s
         with open(PAGENIZE_TEMPLATE_FILENAME, 'r') as f:
             tmpl_str = f.read()
 
+    # Generate string template and substitute
     tmpl = string.Template(tmpl_str)
     try:
         content = tmpl.substitute({
-            'breadcrumb': breadcrumb,
-            'indices': items,
-            'repo': repo
+            'breadcrumb': make_index_breadcrumb(base, inner_paths),
+            'indices': make_index_items(urls),
+            'repo': make_index_repo(git_user, git_repo)
         })
-        with open(index_path, 'w') as f:
-            f.write(content)
     except KeyError as e:
         log(f'The template value {e} is not defined.',  'error')
         sys.exit()
 
+    # Write
+    with open(index_path, 'w') as f:
+        f.write(content)
+
+
+def make_index_breadcrumb(base, inner_list):
+    # Make link title list
+    labs = ['root', *inner_list]
+
+    # Make link list
+    links = [
+        '[{}]({})'.format(f, '{base}/{inner}'.format(base=base, inner='/'.join(labs[1:i+1]))) for i, f in enumerate(labs)
+    ]
+
+    # Return slash-joined links
+    return ' / '.join(links)
+
+
+def make_index_items(file_links):
+    items = "".join([f'- [{f}]({l})\n' for f, l in file_links.items()])
+
+    # Remove the last line feed
+    return items.rstrip()
+
+
+def make_index_repo(user, repo):
+    return f'[{user}/{repo}](https://github.com/{user}/{repo})'
+
 
 def get_repo_info():
-    o = subprocess.check_output(
-        ['git', 'config', '--get', 'remote.origin.url'])
-    remote = str(o).split("'")[1].split('\\n')[0]
+    output = sp.check_output('git config --get remote.origin.url'.split(' '))
+    remote = str(output).split("'")[1].split('\\n')[0]
     if remote.startswith('https://'):
         repo = remote.rsplit('/')[-2:]
     elif remote.startswith('git@'):
@@ -182,7 +200,7 @@ def get_repo_info():
     return repo[0], repo[1]
 
 
-def log(mes: str, logtype: str = None, brankline: bool = True):
+def log(mes: str, logtype: str = None, bl: bool = True):
     if logtype == 'primary':
         prefix = ''
         color = 'green'
@@ -193,12 +211,11 @@ def log(mes: str, logtype: str = None, brankline: bool = True):
         prefix = 'Error: '
         color = 'red'
     else:
-        print('\n', mes, '\n', flush=True) if brankline else print(mes, flush=True)
+        print('\n', mes, '\n', flush=True) if bl else print(mes, flush=True)
         return
 
     mes = colored(f'{prefix}{mes}', color)
-    print('\n', mes, '\n', flush=True) if brankline else print(mes, flush=True)
-    return
+    print('\n', mes, '\n', flush=True) if bl else print(mes, flush=True)
 
 
 if __name__ == '__main__':
