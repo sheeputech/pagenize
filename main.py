@@ -145,7 +145,7 @@ def write_index(index_path: str, inner_paths: list, urls: list, git_user: str, g
         ### Page Information
 
         - Source of this page is in this repository: $repo
-        - This index page is automatically generated with [sheepu-tech/pagenize](https://github.com/sheepu-tech/pagenize)
+        - This index page is automatically generated with [sheeputech/pagenize](https://github.com/sheeputech/pagenize)
     """)
 
     # Read template file
