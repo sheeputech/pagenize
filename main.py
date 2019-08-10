@@ -51,7 +51,12 @@ def make(ctx, yes):
     paths = [
         (v, f'docs{sep}{v.split(sep, 1)[1]}') for v in iglob('./**', recursive=True) if re.search(sre, v)
     ]
-    _, paths_dest = list(zip(*paths))
+
+    if paths:
+        _, paths_dest = list(zip(*paths))
+    else:
+        log('No html/md files in your project.')
+        sys.exit()
 
     # Make dirs
     for p in paths_dest:
@@ -98,7 +103,8 @@ def get_search_regex():
             r = conf[PAGENIZE_CONFIG_SECTION][PAGENIZE_CONFIG_OPTION_SEARCH_INDEX]
             return r
 
-    return r'^(?!.*(README|pagenize)).*(html|md)$'
+    # Exclude README and pagenize config files, then collect html / md files
+    return r'^(?!.*(README|pagenize)).*(\.html|\.md)$'
 
 
 def make_index(path_list: list, sep: str, index_list: list = []):
