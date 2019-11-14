@@ -1,2 +1,0 @@
-class Pagenizer():
-    pass

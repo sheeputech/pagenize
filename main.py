@@ -6,16 +6,18 @@ from textwrap import dedent
 import click
 import copy
 import os
-# import pagenizer
 import platform
 import re
 import string
 import subprocess as sp
 import sys
+from logger import Logger
 
 PAGENIZE_CONFIG_SECTION = 'pagenize'
 PAGENIZE_CONFIG_OPTION_SEARCH_INDEX = 'search_regex'
 PAGENIZE_TEMPLATE_FILENAME = 'pagenize.tmpl.md'
+
+logger = Logger()
 
 
 @click.group(help='pagenize')
@@ -29,15 +31,13 @@ def pagenize(ctx):
 @click.pass_context
 def make(ctx, yes):
     if not is_git_repo():
-        log('This is not a git repository.', 'error')
-        sys.exit()
+        logger.fatal('This is not a git repository.')
 
     # Confirmation
     cwd = os.getcwd()
     if not yes:
         if input(f'--> Do you pagenize "{cwd}" ? (y/N): ') != 'y':
-            log('Pagenize aborted.')
-            sys.exit()
+            logger.fatal('Pagenize aborted.')
 
     # Remove docs/
     if os.path.isdir('docs'):
@@ -55,8 +55,7 @@ def make(ctx, yes):
     if paths:
         _, paths_dest = list(zip(*paths))
     else:
-        log('No html/md files in your project.')
-        sys.exit()
+        logger.fatal('No html/md files in your project.')
 
     # Make dirs
     for p in paths_dest:
@@ -65,14 +64,14 @@ def make(ctx, yes):
             os.makedirs(dirname)
 
     # Copy files into docs
-    [(log(f'{f} -> {t}', 'primary', False), copy2(f, t)) for f, t in paths]
+    [(logger.primary(f'{f} -> {t}'), copy2(f, t)) for f, t in paths]
 
     # Make index.md for each dir in docs/
-    log("Making index pages...")
+    logger.info("Making index pages...")
 
-    [log(v, "primary", False) for v in make_index(['.', 'docs'], sep)]
+    [logger.primary(v) for v in make_index(['.', 'docs'], sep)]
 
-    log("Completed.")
+    logger.info("Completed.")
 
 
 def is_git_repo() -> bool:
@@ -104,7 +103,7 @@ def get_search_regex():
             return r
 
     # Exclude README and pagenize config files, then collect html / md files
-    return r'^(?!.*(README|pagenize)).*(\.html|\.md)$'
+    return r'^(?!.*(README|pagenize)).*(\.html|\.md|\.jpg|\.png)$'
 
 
 def make_index(path_list: list, sep: str, index_list: list = []):
@@ -125,8 +124,18 @@ def make_index(path_list: list, sep: str, index_list: list = []):
         child.append(file)
 
         # Remove file extension: Prevent browsers from displaying raw source codes of Markdown
-        file_name = file.rsplit('.', 1)[0]
+        splf = file.rsplit('.', 1)
+        file_name = splf[0]
+        file_ext = ""
+        if len(splf) == 1:
+            file_name += "/index"
+        else:
+            file_ext = splf[1]
+
+        file_name = file if file_ext in ["jpg", "png"] else file_name
+
         links[file] = '/'.join([p_base, *p_inner, file_name])
+
         if os.path.isdir(sep.join(child)):
             make_index(child, sep, index_list=index_list)
 
@@ -168,8 +177,7 @@ def write_index(index_path: str, inner_paths: list, urls: list, git_user: str, g
             'repo': make_index_repo(git_user, git_repo)
         })
     except KeyError as e:
-        log(f'The template value {e} is not defined.',  'error')
-        sys.exit()
+        logger.fatal(f'The template value {e} is not defined.')
 
     # Write
     with open(index_path, 'w') as f:
@@ -224,33 +232,6 @@ def get_repo_info():
     elif remote.startswith('git@'):
         repo = remote.rsplit(':', 1)[1].split('/')
     else:
-        log('Unexpected remote repository url', 'error')
-        sys.exit()
+        logger.fatal('Unexpected remote repository url')
 
     return repo[0], repo[1]
-
-
-def log(mes: str, logtype: str = None, bl: bool = True):
-    """
-    Logging util.
-    """
-
-    if logtype == 'primary':
-        prefix = ''
-        color = 'green'
-    elif logtype == 'warn':
-        prefix = 'Warn: '
-        color = 'yellow'
-    elif logtype == 'error':
-        prefix = 'Error: '
-        color = 'red'
-    else:
-        print('\n', mes, '\n', flush=True) if bl else print(mes, flush=True)
-        return
-
-    mes = colored(f'{prefix}{mes}', color)
-    print('\n', mes, '\n', flush=True) if bl else print(mes, flush=True)
-
-
-if __name__ == '__main__':
-    pagenize()
