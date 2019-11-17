@@ -13,11 +13,7 @@ import subprocess as sp
 import sys
 from logger import Logger
 
-PAGENIZE_CONFIG_SECTION = 'pagenize'
-PAGENIZE_CONFIG_OPTION_SEARCH_INDEX = 'search_regex'
 PAGENIZE_TEMPLATE_FILENAME = 'pagenize.tmpl.md'
-
-logger = Logger()
 
 
 @click.group(help='pagenize')
@@ -31,13 +27,12 @@ def pagenize(ctx):
 @click.pass_context
 def make(ctx, yes):
     if not is_git_repo():
-        logger.fatal('This is not a git repository.')
+        Logger.fatal('Here is not a git repository.')
 
     # Confirmation
     cwd = os.getcwd()
-    if not yes:
-        if input(f'--> Do you pagenize "{cwd}" ? (y/N): ') != 'y':
-            logger.fatal('Pagenize aborted.')
+    if not yes and input(f'--> Do you pagenize "{cwd}" ? (y/N): ') != 'y':
+        Logger.fatal('Pagenize aborted.')
 
     # Remove docs/
     if os.path.isdir('docs'):
@@ -47,31 +42,29 @@ def make(ctx, yes):
 
     # Search files
     sre = get_search_regex()
-    sep = get_path_sep()
+    delim = get_delim()
     paths = [
-        (v, f'docs{sep}{v.split(sep, 1)[1]}') for v in iglob('./**', recursive=True) if re.search(sre, v)
+        (v, f'docs{delim}{v.split(delim, 1)[1]}') for v in iglob('./**', recursive=True) if re.search(sre, v)
     ]
-
-    if paths:
-        _, paths_dest = list(zip(*paths))
-    else:
-        logger.fatal('No html/md files in your project.')
+    if not paths:
+        Logger.fatal('No target files in your project. Pagenize aborted.')
 
     # Make dirs
+    _, paths_dest = list(zip(*paths))
     for p in paths_dest:
-        dirname = p.rsplit(sep, 1)[0]
+        dirname = p.rsplit(delim, 1)[0]
         if not os.path.isdir(dirname):
             os.makedirs(dirname)
 
     # Copy files into docs
-    [(logger.primary(f'{f} -> {t}'), copy2(f, t)) for f, t in paths]
+    copy_to_docs(paths)
 
     # Make index.md for each dir in docs/
-    logger.info("Making index pages...")
+    Logger.info("Making index pages...")
 
-    [logger.primary(v) for v in make_index(['.', 'docs'], sep)]
+    [Logger.primary(v) for v in make_index(['.', 'docs'], delim)]
 
-    logger.info("Completed.")
+    Logger.info("Completed.")
 
 
 def is_git_repo() -> bool:
@@ -82,7 +75,7 @@ def is_git_repo() -> bool:
     return os.listdir(path='.').count('.git') == 1
 
 
-def get_path_sep() -> str:
+def get_delim() -> str:
     """
     Return file path separator for each operation systems.
     """
@@ -95,18 +88,14 @@ def get_search_regex():
     Return regex for searching files.
     """
 
-    if os.path.isfile('pagenize.ini'):
-        conf = ConfigParser()
-        conf.read('pagenize.ini')
-        if conf.has_section(PAGENIZE_CONFIG_SECTION) and conf.has_option(PAGENIZE_CONFIG_SECTION, PAGENIZE_CONFIG_OPTION_SEARCH_INDEX):
-            r = conf[PAGENIZE_CONFIG_SECTION][PAGENIZE_CONFIG_OPTION_SEARCH_INDEX]
-            return r
-
-    # Exclude README and pagenize config files, then collect html / md files
     return r'^(?!.*(README|pagenize)).*(\.html|\.md|\.jpg|\.png)$'
 
 
-def make_index(path_list: list, sep: str, index_list: list = []):
+def copy_to_docs(paths: list):
+    [(Logger.primary(f'{f} -> {t}'), copy2(f, t)) for f, t in paths]
+
+
+def make_index(path_list: list, delim: str, index_list: list = []):
     """
     Make files for index pages.
     """
@@ -115,11 +104,11 @@ def make_index(path_list: list, sep: str, index_list: list = []):
     p_base = f'https://{git_user}.github.io/{git_repo}'
     p_inner = path_list[2:] if len(path_list) > 2 else []
 
-    index_path = sep.join([*path_list, 'index.md'])
+    index_path = delim.join([*path_list, 'index.md'])
     index_list.append(index_path)
 
     links = {}
-    for file in sorted(os.listdir(sep.join(path_list))):
+    for file in sorted(os.listdir(delim.join(path_list))):
         child = copy.copy(path_list)
         child.append(file)
 
@@ -136,8 +125,8 @@ def make_index(path_list: list, sep: str, index_list: list = []):
 
         links[file] = '/'.join([p_base, *p_inner, file_name])
 
-        if os.path.isdir(sep.join(child)):
-            make_index(child, sep, index_list=index_list)
+        if os.path.isdir(delim.join(child)):
+            make_index(child, delim, index_list=index_list)
 
     write_index(index_path, p_inner, links, git_user, git_repo, p_base)
 
@@ -177,7 +166,7 @@ def write_index(index_path: str, inner_paths: list, urls: list, git_user: str, g
             'repo': make_index_repo(git_user, git_repo)
         })
     except KeyError as e:
-        logger.fatal(f'The template value {e} is not defined.')
+        Logger.fatal(f'The template value {e} is not defined.')
 
     # Write
     with open(index_path, 'w') as f:
@@ -232,6 +221,6 @@ def get_repo_info():
     elif remote.startswith('git@'):
         repo = remote.rsplit(':', 1)[1].split('/')
     else:
-        logger.fatal('Unexpected remote repository url')
+        Logger.fatal('Unexpected remote repository url')
 
     return repo[0], repo[1]
