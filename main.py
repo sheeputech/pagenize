@@ -34,7 +34,16 @@ def make(ctx, yes):
     if not yes and input(f'--> Do you pagenize "{cwd}" ? (y/N): ') != 'y':
         Logger.fatal('Pagenize aborted.')
 
-    # Remove docs/
+    # TODO Git Status の結果を取得して変更分だけを docs/ に適用する実装にしたい
+    # TODO HTML / MD ファイルが docs/ と元のディレクトリに重複して存在してる問題も解決したい
+    # TODO docs/ から削除する時は直接消すようにして、元のソースで消しても消えないようにする → そうするとファイル名変更時にややこしくなるからそこは要検討
+    # o = sp.check_output(['git', 'status', '-s'])
+    # print(o)
+    # l = list(filter(lambda x: x != '', str(o).split('\'')[1].split('\\n')))
+    # l2 = list(map(lambda x: x.split('  '), l))
+    # print(l2)
+
+    # Remove all docs/
     if os.path.isdir('docs'):
         rmtree('docs')
     elif os.path.isfile('docs'):
