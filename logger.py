@@ -16,13 +16,17 @@ class Logger:
 
     @classmethod
     def primary(self, message):
-        self.__print_color_message(self, message, "green")
+        self.__print_color_message(self, message, 'green')
 
     @classmethod
     def warn(self, message):
-        self.__print_color_message(self, message, "yellow")
+        self.__print_color_message(self, message, 'yellow')
 
     @classmethod
     def fatal(self, message):
-        self.__print_color_message(self, message, "red")
+        self.__print_color_message(self, message, 'red')
         sys.exit()
+
+    @classmethod
+    def color_str(self, message, color: str = 'white') -> str:
+        return colored(message, color)
