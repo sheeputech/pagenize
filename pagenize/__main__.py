@@ -1,6 +1,6 @@
 from configparser import ConfigParser
 from glob import glob, iglob
-from logger import Logger
+from .logger import Logger
 from termcolor import colored
 from textwrap import dedent
 import click
@@ -14,22 +14,18 @@ import subprocess
 import sys
 
 PAGENIZE_TEMPLATE_FILENAME = 'pagenize.tmpl.md'
-WATCH_FILE_EXTENSION_LIST = ['html', 'md', 'png', 'jpg']
-
-"""
-TODO 改善余地
-
-- index.md が docs/ の状態に依存している
-"""
+WATCH_FILE_EXTENSION_LIST = [
+    'html', 'md', 'png', 'PNG', 'jpg', 'JPG', 'css', 'js', 'woff', 'pdf'
+]
 
 
 @click.group(help='pagenize')
 @click.pass_context
-def pagenize(ctx):
+def main(ctx):
     pass
 
 
-@pagenize.command(help='Collect your .html and .md files into docs/ with index pages.')
+@main.command(help='Collect your .html and .md files into docs/ with index pages.')
 @click.option('-y', '--no-ask', 'yes', is_flag=True, help='Answer "yes" automatically.')
 @click.pass_context
 def make(ctx, yes):
@@ -41,6 +37,17 @@ def make(ctx, yes):
     if not yes and input(f'--> Do you pagenize "{cwd}" ? (y/N): ') != 'y':
         Logger.fatal('Pagenize aborted.')
 
+    """Must improve start"""
+    # Remove all index.md
+    Logger.info('Removing existing index.md files...')
+    for index_file in iglob('./docs/**/*index.md', recursive=True):
+        os.remove(index_file)
+
+    # Git add all
+    Logger.info('Running git add...')
+    subprocess.run('git add --all'.split(' '))
+    """Must improve end"""
+
     # Get list of changed files from git
     changed_files = list_changed_files()
 
@@ -49,7 +56,7 @@ def make(ctx, yes):
     # Make index.md for each dir in docs/
     Logger.info("Making index pages...")
 
-    [Logger.primary(v) for v in make_index(['.', 'docs'])]
+    make_index(['.', 'docs'])
 
     Logger.info("Completed.")
 
@@ -97,7 +104,20 @@ def apply_changes_to_docs(changed_files: list):
             prefix = Logger.color_str('RENAME', 'blue')
             Logger.info(f'{prefix}: {path_docs}\n     -> {path_new_docs}')
 
+            # Create parent dirs if not exist when move new file into docs/
+            dir_docs = os.path.dirname(path_docs)
+            if not os.path.exists(dir_docs):
+                os.makedirs(dir_docs)
+
             # Move file
+            if os.path.isfile(path_docs):
+                os.remove(path_docs)  # docs/ に残っているファイル名変更前のファイルを削除する
+
+            # Create parent dirs if not exist when move new file into docs/
+            dir_docs = os.path.dirname(path_new_docs)
+            if not os.path.exists(dir_docs):
+                os.makedirs(dir_docs)
+
             shutil.copy2(path_new, path_new_docs)
 
         elif status == 'A':  # Add
@@ -117,6 +137,11 @@ def apply_changes_to_docs(changed_files: list):
         elif status == 'M':  # Modify
             path = changed_file[1][0]
             [path_docs] = concat_docs(path)
+
+            # Create parent dirs if not exist when move new file into docs/
+            dir_docs = os.path.dirname(path_docs)
+            if not os.path.exists(dir_docs):
+                os.makedirs(dir_docs)
 
             prefix = Logger.color_str('MODIFY', 'green')
             Logger.info(f'{prefix}: {path_docs}')
@@ -272,3 +297,7 @@ def get_repo_info():
         Logger.fatal('Unexpected remote repository url')
 
     return repo[0], repo[1]
+
+
+if __name__ == '__main__':
+    main()

@@ -6,7 +6,7 @@ setup(
     install_requires=['click', 'tqdm', 'termcolor'],
     entry_points={
         'console_scripts': [
-            'pagenize = main:pagenize'
+            'pagenize = pagenize.__main__:main'
         ]
     }
 )
