@@ -15,7 +15,7 @@ import sys
 
 PAGENIZE_TEMPLATE_FILENAME = 'pagenize.tmpl.md'
 WATCH_FILE_EXTENSION_LIST = [
-    'html', 'md', 'png', 'PNG', 'jpg', 'JPG', 'css', 'js', 'woff', 'pdf'
+    'html', 'md', 'png', 'PNG', 'jpg', 'JPG', 'css', 'js', 'woff'
 ]
 
 
